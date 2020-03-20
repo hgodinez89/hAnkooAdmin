@@ -1,0 +1,330 @@
+--
+--
+-- You should execute this SQL with SYS user
+CREATE OR REPLACE AND COMPILE 
+ JAVA SOURCE 
+   NAMED DelayJava 
+   AS
+public class DelayJava 
+  {
+    public static void DelayJDK() 
+     {
+       try {
+             Thread.sleep(600);
+            } catch (InterruptedException ex) 
+              {
+              }
+     }
+  };
+  
+GRANT EXECUTE ON JAVA SOURCE SYSTEM.DELAYJAVA TO PUBLIC; 
+
+CREATE PUBLIC SYNONYM DELAYJAVA FOR SYSTEM.DELAYJAVA;
+
+--
+
+CREATE OR REPLACE PROCEDURE Cons_DelayJava
+AS
+   LANGUAGE JAVA
+   NAME 'DelayJava.DelayJDK()';
+   
+GRANT EXECUTE ON Cons_DelayJava TO PUBLIC;
+
+CREATE PUBLIC SYNONYM Cons_DelayJava FOR System.Cons_DelayJava;
+
+--
+-- You need to replace ORACLE_HOME for your own Path.
+CREATE TABLESPACE PG_DAT DATAFILE 
+  'ORACLE_HOME\PG_DAT.DBF' SIZE 2M AUTOEXTEND ON NEXT 1M MAXSIZE UNLIMITED
+LOGGING
+ONLINE
+PERMANENT
+EXTENT MANAGEMENT LOCAL UNIFORM SIZE 40K
+BLOCKSIZE 8K
+SEGMENT SPACE MANAGEMENT MANUAL
+FLASHBACK ON;
+
+--
+
+CREATE TABLESPACE PG_IDX DATAFILE 
+  'ORACLE_HOME\PG_IDX.DBF' SIZE 1M AUTOEXTEND ON NEXT 1M MAXSIZE UNLIMITED
+LOGGING
+ONLINE
+PERMANENT
+EXTENT MANAGEMENT LOCAL UNIFORM SIZE 40K
+BLOCKSIZE 8K
+SEGMENT SPACE MANAGEMENT MANUAL
+FLASHBACK ON;
+
+--
+-- You should change the user's password
+CREATE USER PG
+  IDENTIFIED BY PG
+  DEFAULT TABLESPACE PG_DAT
+  TEMPORARY TABLESPACE TEMP
+  PROFILE DEFAULT
+  ACCOUNT UNLOCK;
+  GRANT RESOURCE TO PG;
+  GRANT CONNECT TO PG;
+  ALTER USER PG DEFAULT ROLE ALL;
+  GRANT ALTER USER TO PG;
+  GRANT CREATE SESSION TO PG;
+  GRANT CREATE PROCEDURE TO PG;
+  GRANT UNLIMITED TABLESPACE TO PG;
+  GRANT CREATE ANY INDEX TO PG;
+  GRANT CREATE VIEW TO PG;
+  GRANT CREATE PUBLIC SYNONYM TO PG;
+  ALTER USER PG QUOTA UNLIMITED ON PG_DAT;
+  ALTER USER PG QUOTA UNLIMITED ON PG_IDX;
+
+--
+-- Tables
+CREATE TABLE PG.PG_MAESTRO_PAGOS
+(
+  COD_COMPANIA      VARCHAR2(4 BYTE)                 NOT NULL,
+  NUM_PAGO          NUMBER(10)                       NOT NULL,
+  COD_CLIENTE       NUMBER(10)                       NOT NULL,
+  FECHA_PAGO        DATE                             DEFAULT SYSDATE,
+  COD_RUTA          NUMBER(10)                       NOT NULL,
+  COD_MONEDA        VARCHAR2(4 BYTE)                 NOT NULL,
+  MONTO_PAGO        NUMBER(18, 2)                    DEFAULT 0,
+  IND_DESCUENTO     VARCHAR2(1 BYTE)                 DEFAULT 'N',
+  MONTO_DESCUENTO   NUMBER(18, 2)                    DEFAULT 0,
+  MONTO_TOTALPAGO   NUMBER(18, 2)                    DEFAULT 0,
+  SALDO_ACTUAL_SP   NUMBER(18, 2)                    DEFAULT 0,
+  SALDO_ACTUAL_CP   NUMBER(18, 2)                    DEFAULT 0,
+  COD_ESTADO        VARCHAR2(4 BYTE)                 DEFAULT 'REG',
+  OBSERVACIONES     VARCHAR2(500 BYTE),
+  OBSER_ANULA       VARCHAR2(500 BYTE),
+  USER_ANULA        VARCHAR2(30 BYTE),
+  FECHA_ANULA       DATE,
+  USER_REG          VARCHAR2(30 BYTE),
+  FECHA_REG         DATE
+)
+TABLESPACE PG_DAT
+PCTUSED    40
+PCTFREE    10
+INITRANS   1
+MAXTRANS   255
+STORAGE    (
+            INITIAL          10880K
+            NEXT             40K
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            FREELISTS        1
+            FREELIST GROUPS  1
+            BUFFER_POOL      DEFAULT
+           )
+LOGGING 
+NOCOMPRESS 
+NOCACHE
+NOPARALLEL
+MONITORING;
+
+
+CREATE UNIQUE INDEX PG.PK_PG_MAESTRO_PAGOS ON PG.PG_MAESTRO_PAGOS
+(COD_COMPANIA, NUM_PAGO)
+LOGGING
+TABLESPACE PG_IDX
+PCTFREE    10
+INITRANS   2
+MAXTRANS   255
+STORAGE    (
+            INITIAL          4160K
+            NEXT             40K
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            FREELISTS        1
+            FREELIST GROUPS  1
+            BUFFER_POOL      DEFAULT
+           )
+NOPARALLEL;
+
+
+CREATE PUBLIC SYNONYM PG_MAESTRO_PAGOS FOR PG.PG_MAESTRO_PAGOS;
+
+
+ALTER TABLE PG.PG_MAESTRO_PAGOS ADD (
+  CONSTRAINT PK_PG_MAESTRO_PAGOS
+ PRIMARY KEY
+ (COD_COMPANIA, NUM_PAGO)
+    USING INDEX 
+    TABLESPACE PG_IDX
+    PCTFREE    10
+    INITRANS   2
+    MAXTRANS   255
+    STORAGE    (
+                INITIAL          4160K
+                NEXT             40K
+                MINEXTENTS       1
+                MAXEXTENTS       UNLIMITED
+                PCTINCREASE      0
+                FREELISTS        1
+                FREELIST GROUPS  1
+               ));
+
+ALTER TABLE PG.PG_MAESTRO_PAGOS
+ ADD CONSTRAINT FK_CLIENTES_PG_MAESTRO_PAGOS
+ FOREIGN KEY (COD_COMPANIA, COD_CLIENTE) 
+ REFERENCES CL.CL_CLIENTES (COD_COMPANIA, COD_CLIENTE);
+
+ALTER TABLE PG.PG_MAESTRO_PAGOS
+ ADD CONSTRAINT FK_MONEDAS_PG_MAESTRO_PAGOS
+ FOREIGN KEY (COD_COMPANIA, COD_MONEDA) 
+ REFERENCES PA.PA_MONEDAS (COD_COMPANIA, COD_MONEDA);
+
+ALTER TABLE PG.PG_MAESTRO_PAGOS
+ ADD CONSTRAINT FK_RUTAS_PG_MAESTRO_PAGOS
+ FOREIGN KEY (COD_COMPANIA, COD_RUTA) 
+ REFERENCES RU.RU_RUTAS (COD_COMPANIA, COD_RUTA);
+
+GRANT DELETE, INSERT, SELECT, UPDATE, REFERENCES ON PG.PG_MAESTRO_PAGOS TO PUBLIC;
+
+--
+
+CREATE OR REPLACE TRIGGER PG.TRG_MONTO_TOTALPAGO
+   BEFORE INSERT OR UPDATE OF 
+   MONTO_PAGO, MONTO_DESCUENTO ON 
+   PG.PG_MAESTRO_PAGOS 
+ REFERENCING NEW AS New OLD AS Old
+ FOR EACH ROW
+BEGIN
+  --
+  :New.Monto_TotalPago := :New.Monto_Pago + :New.Monto_Descuento;
+  --
+END;
+/
+
+--
+
+CREATE TABLE PG.PG_DETALLE_PAGOS
+(
+  COD_COMPANIA      VARCHAR2(4 BYTE)                 NOT NULL,
+  NUM_PAGO          NUMBER(10)                       NOT NULL,
+  NO_VENTA_ASOCIADA NUMBER(10)                       NOT NULL,
+  MONTO_PAGO        NUMBER(18, 2)                    DEFAULT 0
+)
+TABLESPACE PG_DAT
+PCTUSED    40
+PCTFREE    10
+INITRANS   1
+MAXTRANS   255
+STORAGE    (
+            INITIAL          10880K
+            NEXT             40K
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            FREELISTS        1
+            FREELIST GROUPS  1
+            BUFFER_POOL      DEFAULT
+           )
+LOGGING 
+NOCOMPRESS 
+NOCACHE
+NOPARALLEL
+MONITORING;
+
+
+CREATE UNIQUE INDEX PG.PK_PG_DETALLE_PAGOS ON PG.PG_DETALLE_PAGOS
+(COD_COMPANIA, NUM_PAGO, NO_VENTA_ASOCIADA)
+LOGGING
+TABLESPACE PG_IDX
+PCTFREE    10
+INITRANS   2
+MAXTRANS   255
+STORAGE    (
+            INITIAL          4160K
+            NEXT             40K
+            MINEXTENTS       1
+            MAXEXTENTS       UNLIMITED
+            PCTINCREASE      0
+            FREELISTS        1
+            FREELIST GROUPS  1
+            BUFFER_POOL      DEFAULT
+           )
+NOPARALLEL;
+
+
+CREATE PUBLIC SYNONYM PG_DETALLE_PAGOS FOR PG.PG_DETALLE_PAGOS;
+
+
+ALTER TABLE PG.PG_DETALLE_PAGOS ADD (
+  CONSTRAINT PK_PG_DETALLE_PAGOS
+ PRIMARY KEY
+ (COD_COMPANIA, NUM_PAGO, NO_VENTA_ASOCIADA)
+    USING INDEX 
+    TABLESPACE PG_IDX
+    PCTFREE    10
+    INITRANS   2
+    MAXTRANS   255
+    STORAGE    (
+                INITIAL          4160K
+                NEXT             40K
+                MINEXTENTS       1
+                MAXEXTENTS       UNLIMITED
+                PCTINCREASE      0
+                FREELISTS        1
+                FREELIST GROUPS  1
+               ));
+
+ALTER TABLE PG.PG_DETALLE_PAGOS
+ ADD CONSTRAINT FK_MAESTRO_PG_DETALLE_PAGOS
+ FOREIGN KEY (COD_COMPANIA, NUM_PAGO) 
+ REFERENCES PG.PG_MAESTRO_PAGOS (COD_COMPANIA, NUM_PAGO);
+
+GRANT DELETE, INSERT, SELECT, UPDATE, REFERENCES ON PG.PG_DETALLE_PAGOS TO PUBLIC;
+
+--
+
+CREATE SEQUENCE PG.SQ_NUMPAGO
+START WITH 1
+INCREMENT BY 1
+MINVALUE 1
+MAXVALUE 9999999999
+NOCACHE 
+NOCYCLE 
+NOORDER;
+
+GRANT SELECT ON PG.SQ_NUMPAGO TO PUBLIC;
+
+CREATE PUBLIC SYNONYM SQ_NUMPAGO FOR PG.SQ_NUMPAGO;
+
+--
+
+CREATE OR REPLACE PROCEDURE PG.CREA_DETALLEPAGO(pCodCompania IN VARCHAR2,
+                                                pNumPago     IN NUMBER,
+                                                pNoVentaAsoc IN NUMBER,
+                                                pMontoPago   IN NUMBER,
+                                                pEstadoEj    OUT BOOLEAN,
+                                                pError       OUT VARCHAR2
+                                               ) IS
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   --
+   -- Crea el detalle de un pago
+   --
+BEGIN
+   --
+   Insert Into Pg_Detalle_Pagos(Cod_Compania, Num_Pago,
+                                No_Venta_Asociada, Monto_Pago
+                               )
+               Values          (pCodCompania, pNumPago,
+                                pNoVentaAsoc, pMontoPago
+                               );
+   --
+   pEstadoEj := TRUE;
+   --
+   Commit;
+   --
+EXCEPTION
+   WHEN OTHERS THEN
+       RollBack;
+       pEstadoEj := FALSE;
+       pError    := 'Error al crear el detalle del pago '||Sqlerrm;
+END;
+
+GRANT EXECUTE ON PG.CREA_DETALLEPAGO TO PUBLIC;
+
+CREATE PUBLIC SYNONYM CREA_DETALLEPAGO FOR PG.CREA_DETALLEPAGO;
