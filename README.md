@@ -6,7 +6,7 @@
   <p align="center">
     This is an administration software.
     <br>
-    <a href="https://github.com/hgodinez89/Movie-Database/issues/new">Report bug</a>
+    <a href="https://github.com/hgodinez89/hAnkooAdmin/issues/new">Report bug</a>
   </p>
 </p>
 
